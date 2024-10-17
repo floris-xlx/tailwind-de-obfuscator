@@ -253,16 +253,7 @@ export default function Home() {
 
         <div>
 
-          <Input type="text" placeholder="Css class" value={cssClass} onChange={handleInputChange} />
 
-          <div className='pt-8'>
-            <p>
-              Tailwind class:
-            </p>
-            <div className='border rounded-md p-2 mt-2 w-[250px] h-[36px]'>
-              {tailwindClass}
-            </div>
-          </div>
 
           <div className='flex flex-row gap-x-8'>
             <div className='pt-8'>
