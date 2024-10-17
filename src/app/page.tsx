@@ -90,6 +90,7 @@ function convertCssToTailwind(cssClass) {
       regex: /^padding-bottom:\s*calc\((\.?\d+rem)\s*\*\s*calc\(1\s*-\s*var\(--tw-space-y-reverse\)\)\);?$/,
       tailwind: (match: RegExpMatchArray) => `pb-[${parseFloat(match[1])}rem]`
     },
+    { regex: /^margin-left:\s*auto;\s*margin-right:\s*auto;?$/, tailwind: 'mx-auto' },
     { regex: /^margin-left:\s*auto;?$/, tailwind: 'ml-auto' },
     { regex: /^margin-right:\s*auto;?$/, tailwind: 'mr-auto' },
     { regex: /^grid-column:\s*1\s*\/\s*-1;?$/, tailwind: 'col-span-full' },
@@ -99,9 +100,23 @@ function convertCssToTailwind(cssClass) {
       regex: /^color:\s*rgb\((\d+)\s(\d+)\s(\d+)\/var\(--tw-text-opacity\)\);?$/,
       tailwind: (match: RegExpMatchArray) => `text-[rgb(${match[1]},${match[2]},${match[3]}/1)]`
     },
+    { regex: /^font-weight:\s*500;?$/, tailwind: 'font-[500]' },
+    { regex: /^font-weight:\s*400;?$/, tailwind: 'font-[400]' },
+    { regex: /^font-weight:\s*100;?$/, tailwind: 'font-[100]' },
+    { regex: /^font-weight:\s*200;?$/, tailwind: 'font-[200]' },
+    { regex: /^font-weight:\s*300;?$/, tailwind: 'font-[300]' },
+    { regex: /^font-weight:\s*600;?$/, tailwind: 'font-[600]' },
+    { regex: /^font-weight:\s*700;?$/, tailwind: 'font-[700]' },
+    { regex: /^font-weight:\s*800;?$/, tailwind: 'font-[800]' },
+    {
+      regex: /^max-width:\s*(.+);$/,
+      tailwind: (match: RegExpMatchArray) => `max-w-[${match[1]}]`
+    },
+    {
+      regex: /^max-height:\s*(.+);$/,
+      tailwind: (match: RegExpMatchArray) => `max-h-[${match[1]}]`
+    },
   ];
-
-
 
   // Add logic for margin and padding with directions
   directions.forEach(direction => {
@@ -170,6 +185,7 @@ export default function Home() {
       console.log('Processing line:', line);
       const classMatch = line.match(/^\.(\w+)\s*{\s*$/);
       const styleMatch = line.match(/^\s*([\w-]+:\s*[^;]+;)\s*$/);
+      const closingBraceMatch = line.match(/^\s*}\s*$/);
 
       if (classMatch) {
         if (currentClass && tailwindStyles.length > 0) {
@@ -187,13 +203,15 @@ export default function Home() {
         if (tailwindStyle) {
           tailwindStyles.push(tailwindStyle);
         }
+      } else if (closingBraceMatch && currentClass) {
+        if (tailwindStyles.length > 0) {
+          map[currentClass] = tailwindStyles.join(' ');
+          console.log('Updated map:', map);
+        }
+        currentClass = '';
+        tailwindStyles = [];
       }
     });
-
-    if (currentClass && tailwindStyles.length > 0) {
-      map[currentClass] = tailwindStyles.join(' ');
-      console.log('Updated map:', map);
-    }
 
     console.log('Final map:', map);
     return map;
@@ -228,25 +246,26 @@ export default function Home() {
             </div>
           </div>
 
-          <div className='pt-8'>
-            <p>
-              Styling Sheet:
-            </p>
-            <textarea
-              className='border rounded-md p-2 mt-2 w-[550px] h-[500px] text-[11px]'
-              value={styleSheet}
-              onChange={handleStyleSheetChange}
-              placeholder="Enter your styling sheet here"
-            />
-          </div>
-
-          <div className='pt-8'>
-            <p>
-              Tailwind Map:
-            </p>
-            <pre className='border rounded-md p-2 mt-2 w-[550px] h-[200px] text-[11px] overflow-auto'>
-              {JSON.stringify(tailwindMap, null, 2)}
-            </pre>
+          <div className='flex flex-row gap-x-8'>
+            <div className='pt-8'>
+              <p>
+                Styling Sheet:
+              </p>
+              <textarea
+                className='border rounded-md p-2 mt-2 w-[605px] h-[500px] text-[11px]'
+                value={styleSheet}
+                onChange={handleStyleSheetChange}
+                placeholder="Enter your styling sheet here"
+              />
+            </div>
+            <div className='pt-8'>
+              <p>
+                Tailwind Map:
+              </p>
+              <pre className='border rounded-md p-2 mt-2 w-[605px] h-[500px] text-[11px] overflow-auto'>
+                {JSON.stringify(tailwindMap, null, 2)}
+              </pre>
+            </div>
           </div>
 
           <div className='pt-8'>
@@ -254,7 +273,7 @@ export default function Home() {
               Obfuscated Component:
             </p>
             <textarea
-              className='border rounded-md p-2 mt-2 w-[550px] h-[200px] text-[11px]'
+              className='border rounded-md p-2 mt-2 w-[1250px] h-[400px] text-[11px]'
               value={obfuscatedComponent}
               onChange={handleObfuscatedComponentChange}
               placeholder="Enter your obfuscated component here"
@@ -265,7 +284,7 @@ export default function Home() {
             <p>
               Deobfuscated Component:
             </p>
-            <pre className='border rounded-md p-2 mt-2 w-[550px] h-[200px] text-[11px] overflow-auto'>
+            <pre className='border rounded-md p-2 mt-2 w-[1250px] h-[400px] text-[11px] overflow-auto'>
               {deobfuscatedComponent}
             </pre>
           </div>
