@@ -5,6 +5,9 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 
 function convertCssToTailwind(cssClass) {
+  // Remove !important from the CSS class
+  cssClass = cssClass.replace(/\s*!important\s*;?$/, '');
+
   const unitPattern = '(-?\\d*(\\.\\d+)?)(px|rem|%)';
   const regexMap = [
     { regex: new RegExp(`^padding:\\s*${unitPattern};?$`), tailwind: 'p-' },
@@ -53,6 +56,39 @@ function convertCssToTailwind(cssClass) {
     { regex: /^background-image:\s*none;?$/, tailwind: 'bg-none' },
     { regex: /^display:\s*inline-flex;?$/, tailwind: 'inline-flex' },
     { regex: /^justify-content:\s*flex-start;?$/, tailwind: 'justify-start' },
+    { regex: /^box-sizing:\s*border-box;?$/, tailwind: 'box-border' },
+    { regex: /^font-weight:\s*(\d+)\s*!important;?$/, tailwind: (match: RegExpMatchArray) => `font-[${match[1]}]` },
+    { regex: /^text-wrap:\s*balance;?$/, tailwind: 'text-balance' },
+    { regex: /^background-color:\s*rgb\((\d+)\s(\d+)\s(\d+)\/var\(--tw-bg-opacity\)\);?$/, tailwind: (match: RegExpMatchArray) => `bg-[rgb(${match[1]},${match[2]},${match[3]}/1)]` },
+    { regex: /^font-style:\s*normal;?$/, tailwind: 'not-italic' },
+    {
+      regex: /^border:\s*0\s*solid\s*#([0-9a-fA-F]{6});?$/,
+      tailwind: (match: RegExpMatchArray) => `border-0 border-[#${match[1]}]`
+    },
+    {
+      regex: /^transition-duration:\s*(\.\d+|\d+(\.\d+)?)s;?$/,
+      tailwind: (match: RegExpMatchArray) => `duration-[${parseFloat(match[1]) * 1000}]`
+    },
+    {
+      regex: /^margin-left:\s*calc\((\.?\d+rem)\s*\*\s*calc\(1\s*-\s*var\(--tw-space-x-reverse\)\)\);?$/,
+      tailwind: (match: RegExpMatchArray) => `ml-[${parseFloat(match[1])}]`
+    },
+    {
+      regex: /^padding-left:\s*calc\((\.?\d+rem)\s*\*\s*calc\(1\s*-\s*var\(--tw-space-x-reverse\)\)\);?$/,
+      tailwind: (match: RegExpMatchArray) => `pl-[${parseFloat(match[1])}]`
+    },
+    {
+      regex: /^padding-right:\s*calc\((\.?\d+rem)\s*\*\s*calc\(1\s*-\s*var\(--tw-space-x-reverse\)\)\);?$/,
+      tailwind: (match: RegExpMatchArray) => `pr-[${parseFloat(match[1])}]`
+    },
+    {
+      regex: /^padding-top:\s*calc\((\.?\d+rem)\s*\*\s*calc\(1\s*-\s*var\(--tw-space-y-reverse\)\)\);?$/,
+      tailwind: (match: RegExpMatchArray) => `pt-[${parseFloat(match[1])}]`
+    },
+    {
+      regex: /^padding-bottom:\s*calc\((\.?\d+rem)\s*\*\s*calc\(1\s*-\s*var\(--tw-space-y-reverse\)\)\);?$/,
+      tailwind: (match: RegExpMatchArray) => `pb-[${parseFloat(match[1])}]`
+    },
   ];
 
   for (const { regex, tailwind } of regexMap) {
