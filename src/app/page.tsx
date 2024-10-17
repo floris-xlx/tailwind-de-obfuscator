@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
 
 function convertCssToTailwind(cssClass) {
   // Remove !important from the CSS class
@@ -107,12 +109,44 @@ function convertCssToTailwind(cssClass) {
 export default function Home() {
   const [cssClass, setCssClass] = useState('');
   const [tailwindClass, setTailwindClass] = useState('');
+  const [styleSheet, setStyleSheet] = useState('');
+  const [tailwindMap, setTailwindMap] = useState({});
 
   const handleInputChange = (event) => {
     const newCssClass = event.target.value.trim();
     setCssClass(newCssClass);
     const convertedClass = convertCssToTailwind(newCssClass);
     setTailwindClass(convertedClass);
+  };
+
+  const handleStyleSheetChange = (event) => {
+    const newStyleSheet = event.target.value;
+    setStyleSheet(newStyleSheet);
+    const newTailwindMap = convertStyleSheetToTailwindMap(newStyleSheet);
+    setTailwindMap(newTailwindMap);
+  };
+
+  const convertStyleSheetToTailwindMap = (styleSheet) => {
+    const lines = styleSheet.split('\n');
+    const map = {};
+    let currentClass = '';
+
+    lines.forEach(line => {
+      const classMatch = line.match(/^\.(\w+)\s*{\s*$/);
+      const styleMatch = line.match(/^\s*([\w-]+:\s*[^;]+;)\s*$/);
+
+      if (classMatch) {
+        currentClass = classMatch[1];
+      } else if (styleMatch && currentClass) {
+        const cssStyle = styleMatch[1].trim();
+        const tailwindStyle = convertCssToTailwind(cssStyle);
+        if (tailwindStyle) {
+          map[currentClass] = tailwindStyle;
+        }
+      }
+    });
+
+    return map;
   };
 
   return (
@@ -126,11 +160,31 @@ export default function Home() {
           <div className='pt-8'>
             <p>
               Tailwind class:
-
             </p>
             <div className='border rounded-md p-2 mt-2 w-[250px] h-[36px]'>
               {tailwindClass}
             </div>
+          </div>
+
+          <div className='pt-8'>
+            <p>
+              Styling Sheet:
+            </p>
+            <textarea
+              className='border rounded-md p-2 mt-2 w-[550px] h-[500px] text-[11px]'
+              value={styleSheet}
+              onChange={handleStyleSheetChange}
+              placeholder="Enter your styling sheet here"
+            />
+          </div>
+
+          <div className='pt-8'>
+            <p>
+              Tailwind Map:
+            </p>
+            <pre className='border rounded-md p-2 mt-2 w-[550px] h-[200px] text-[11px] overflow-auto'>
+              {JSON.stringify(tailwindMap, null, 2)}
+            </pre>
           </div>
 
         </div>
