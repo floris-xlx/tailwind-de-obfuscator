@@ -128,20 +128,27 @@ function convertCssToTailwind(cssClass) {
     );
   });
 
-  for (const { regex, tailwind } of regexMap) {
-    const match = cssClass.match(regex);
-    if (match) {
-      if (typeof tailwind === 'function') {
-        console.log('match', match);
-        return tailwind(match);
+  const tailwindClasses = [];
+  cssClass.split(';').forEach(style => {
+    style = style.trim();
+    if (style) {
+      for (const { regex, tailwind } of regexMap) {
+        const match = style.match(regex);
+        if (match) {
+          if (typeof tailwind === 'function') {
+            console.log('match', match);
+            tailwindClasses.push(tailwind(match));
+          } else {
+            console.log('match', match);
+            tailwindClasses.push(tailwind);
+          }
+          break;
+        }
       }
-
-      console.log('match', match);
-      return tailwind;
     }
-  }
+  });
 
-  return '';
+  return tailwindClasses.join(' ');
 }
 
 export default function Home() {
@@ -202,6 +209,8 @@ export default function Home() {
         console.log('Converted to Tailwind style:', tailwindStyle);
         if (tailwindStyle) {
           tailwindStyles.push(tailwindStyle);
+        } else {
+          console.warn(`Could not convert style: ${cssStyle}`);
         }
       } else if (closingBraceMatch && currentClass) {
         if (tailwindStyles.length > 0) {
@@ -226,6 +235,15 @@ export default function Home() {
     deobfuscated = deobfuscated.replace(/class="/g, 'className="');
     deobfuscated = deobfuscated.replace(/<!--.*?-->/g, '');
     deobfuscated = deobfuscated.replace(/>/g, '>\n');
+
+    // Check for any classes that were not replaced
+    const unmatchedClasses = deobfuscated.match(/\b\w+\b/g) || [];
+    unmatchedClasses.forEach(unmatchedClass => {
+      if (map[unmatchedClass]) {
+        console.warn(`Class ${unmatchedClass} was not replaced properly.`);
+      }
+    });
+
     return deobfuscated;
   };
 
