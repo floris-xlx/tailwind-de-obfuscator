@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { CodeEditor } from '@/components/ui/code-editor';
+import { FileCode2, Braces, Code as CodeIcon, Wand2 } from 'lucide-react';
 
 function convertCssToTailwind(cssClass) {
   console.log('cssClass', cssClass);
@@ -151,83 +151,113 @@ function convertCssToTailwind(cssClass) {
   return tailwindClasses.join(' ');
 }
 
+function resolveCssVariablesInValue(value: string, variables: Record<string, string>, depth: number = 0): string {
+  if (!value) return value;
+  if (depth > 5) return value;
+
+  const replaced = value.replace(/var\(\s*--([A-Za-z0-9_-]+)\s*(?:,\s*([^\)]+))?\)/g, (_m, name: string, fallback?: string) => {
+    const keyWithDashes = `--${name}`;
+    const direct = variables[keyWithDashes] ?? variables[name];
+    if (direct != null) return direct;
+    if (fallback != null) return resolveCssVariablesInValue(fallback.trim(), variables, depth + 1);
+    return '';
+  });
+
+  if (replaced.includes('var(')) {
+    return resolveCssVariablesInValue(replaced, variables, depth + 1);
+  }
+  return replaced;
+}
+
 export default function Home() {
-  const [cssClass, setCssClass] = useState('');
-  const [tailwindClass, setTailwindClass] = useState('');
   const [styleSheet, setStyleSheet] = useState('');
   const [tailwindMap, setTailwindMap] = useState({});
   const [obfuscatedComponent, setObfuscatedComponent] = useState('');
   const [deobfuscatedComponent, setDeobfuscatedComponent] = useState('');
 
-  const handleInputChange = (event) => {
-    const newCssClass = event.target.value.trim();
-    setCssClass(newCssClass);
-    const convertedClass = convertCssToTailwind(newCssClass);
-    setTailwindClass(convertedClass);
-  };
-
-  const handleStyleSheetChange = (event) => {
-    const newStyleSheet = event.target.value;
-    setStyleSheet(newStyleSheet);
-    const newTailwindMap = convertStyleSheetToTailwindMap(newStyleSheet);
+  const handleStyleSheetChange = (newStyleSheet: string) => {
+    const cleanStyleSheet = newStyleSheet
+      .replace(/<style[^>]*>/gi, '')
+      .replace(/<\/style>/gi, '');
+    setStyleSheet(cleanStyleSheet);
+    const newTailwindMap = convertStyleSheetToTailwindMap(cleanStyleSheet);
     setTailwindMap(newTailwindMap);
   };
 
-  const handleObfuscatedComponentChange = (event) => {
-    const newObfuscatedComponent = event.target.value;
-    setObfuscatedComponent(newObfuscatedComponent);
-    const deobfuscated = deobfuscateComponent(newObfuscatedComponent, tailwindMap);
+  const handleObfuscatedComponentChange = (newObfuscatedComponent: string) => {
+    const withoutStyleBlocks = newObfuscatedComponent.replace(/<style[\s\S]*?<\/style>/gi, '');
+    setObfuscatedComponent(withoutStyleBlocks);
+    const deobfuscated = deobfuscateComponent(withoutStyleBlocks, tailwindMap);
     setDeobfuscatedComponent(deobfuscated);
   };
 
-  const convertStyleSheetToTailwindMap = (styleSheet) => {
-    console.log('Received styleSheet:', styleSheet);
-    const lines = styleSheet.split('\n');
-    console.log('Split lines:', lines);
-    const map = {};
-    let currentClass = '';
-    let tailwindStyles = [];
+  const convertStyleSheetToTailwindMap = (styleSheet: string) => {
+    const map: Record<string, string> = {};
+    const variables: Record<string, string> = {};
 
-    lines.forEach(line => {
-      console.log('Processing line:', line);
-      const classMatch = line.match(/^\.(\w+)\s*{\s*$/);
-      const styleMatch = line.match(/^\s*([\w-]+:\s*[^;]+;)\s*$/);
-      const closingBraceMatch = line.match(/^\s*}\s*$/);
+    const blocks = styleSheet.split('}');
 
-      if (classMatch) {
-        if (currentClass && tailwindStyles.length > 0) {
-          map[currentClass] = tailwindStyles.join(' ');
-          console.log('Updated map:', map);
+    blocks.forEach(block => {
+      if (!block.includes('{')) return;
+      const parts = block.split('{');
+      if (parts.length < 2) return;
+      const bodyRaw = parts.slice(1).join('{').trim();
+      if (!bodyRaw) return;
+      const declarations = bodyRaw.split(';').map(s => s.trim()).filter(Boolean);
+      declarations.forEach(decl => {
+        const idx = decl.indexOf(':');
+        if (idx === -1) return;
+        const prop = decl.slice(0, idx).trim();
+        const val = decl.slice(idx + 1).trim();
+        if (prop.startsWith('--')) {
+          variables[prop] = val;
+          variables[prop.replace(/^--/, '')] = val;
         }
-        currentClass = classMatch[1];
-        tailwindStyles = [];
-        console.log('Found class:', currentClass);
-      } else if (styleMatch && currentClass) {
-        const cssStyle = styleMatch[1].trim();
-        console.log('Found style:', cssStyle);
-        const tailwindStyle = convertCssToTailwind(cssStyle);
-        console.log('Converted to Tailwind style:', tailwindStyle);
-        if (tailwindStyle) {
-          tailwindStyles.push(tailwindStyle);
-        } else {
-          console.warn(`Could not convert style: ${cssStyle}`);
-        }
-      } else if (closingBraceMatch && currentClass) {
-        if (tailwindStyles.length > 0) {
-          map[currentClass] = tailwindStyles.join(' ');
-          console.log('Updated map:', map);
-        }
-        currentClass = '';
-        tailwindStyles = [];
-      }
+      });
     });
 
-    console.log('Final map:', map);
+    blocks.forEach(block => {
+      if (!block.includes('{')) return;
+      const parts = block.split('{');
+      if (parts.length < 2) return;
+      const selectorsRaw = parts[0].trim();
+      const selectorsClean = selectorsRaw.replace(/[\u200B#]+/g, '');
+      const bodyRaw = parts.slice(1).join('{').trim();
+      if (!selectorsRaw || !bodyRaw) return;
+
+      const classMatches = selectorsClean.match(/\.([A-Za-z0-9_-]+)/g) || [];
+      if (classMatches.length === 0) return;
+
+      const declarations = bodyRaw.split(';').map(s => s.trim()).filter(Boolean);
+      if (declarations.length === 0) return;
+
+      const tailwindFromDecls: string[] = [];
+      declarations.forEach(decl => {
+        const idx = decl.indexOf(':');
+        if (idx === -1) return;
+        const prop = decl.slice(0, idx).trim();
+        const val = decl.slice(idx + 1).trim();
+        const resolvedVal = resolveCssVariablesInValue(val, variables);
+        const cssLine = `${prop}: ${resolvedVal};`;
+        const tw = convertCssToTailwind(cssLine);
+        if (tw) tailwindFromDecls.push(tw);
+      });
+
+      const tailwindJoined = tailwindFromDecls.join(' ');
+      if (!tailwindJoined) return;
+
+      const uniqueClasses = Array.from(new Set(classMatches.map(c => c.slice(1))));
+      uniqueClasses.forEach(cls => {
+        map[cls] = tailwindJoined;
+      });
+    });
+
     return map;
   };
 
   const deobfuscateComponent = (component, map) => {
     let deobfuscated = component;
+    deobfuscated = deobfuscated.replace(/<style[\s\S]*?<\/style>/gi, '');
     for (const [key, value] of Object.entries(map)) {
       const regex = new RegExp(`\\b${key}\\b`, 'g');
       deobfuscated = deobfuscated.replace(regex, value);
@@ -248,7 +278,7 @@ export default function Home() {
   };
 
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)] text-black">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
 
         <div>
@@ -257,45 +287,59 @@ export default function Home() {
 
           <div className='flex flex-row gap-x-8'>
             <div className='pt-8'>
-              <p>
-                Styling Sheet:
-              </p>
-              <textarea
-                className='border rounded-md p-2 mt-2 w-[605px] h-[500px] text-[11px]'
+              <div className='flex items-center gap-2 text-secondary'>
+                <FileCode2 size={16} />
+                <span className='text-black'>Styling Sheet</span>
+              </div>
+              <CodeEditor
+                className='border mt-2 w-[605px] rounded-md'
+                height={500}
+                language='css'
                 value={styleSheet}
                 onChange={handleStyleSheetChange}
-                placeholder="Enter your styling sheet here"
               />
             </div>
             <div className='pt-8'>
-              <p>
-                Tailwind Map:
-              </p>
-              <pre className='border rounded-md p-2 mt-2 w-[605px] h-[500px] text-[11px] overflow-auto'>
-                {JSON.stringify(tailwindMap, null, 2)}
-              </pre>
+              <div className='flex items-center gap-2 text-secondary'>
+                <Braces size={16} />
+                <span>Tailwind Map</span>
+              </div>
+              <CodeEditor
+                className='border mt-2 w-[605px] rounded-md'
+                height={500}
+                language='json'
+                value={JSON.stringify(tailwindMap, null, 2)}
+                readOnly
+              />
             </div>
           </div>
 
           <div className='pt-8'>
-            <p>
-              Obfuscated Component:
-            </p>
-            <textarea
-              className='border rounded-md p-2 mt-2 w-[1250px] h-[400px] text-[11px]'
+            <div className='flex items-center gap-2 text-secondary'>
+              <CodeIcon size={16} />
+              <span>Obfuscated Component</span>
+            </div>
+            <CodeEditor
+              className='border mt-2 w-[1250px] rounded-md'
+              height={400}
+              language='html'
               value={obfuscatedComponent}
               onChange={handleObfuscatedComponentChange}
-              placeholder="Enter your obfuscated component here"
             />
           </div>
 
           <div className='pt-8'>
-            <p>
-              Deobfuscated Component:
-            </p>
-            <pre className='border rounded-md p-2 mt-2 w-[1250px] h-[400px] text-[11px] overflow-auto'>
-              {deobfuscatedComponent}
-            </pre>
+            <div className='flex items-center gap-2 text-secondary'>
+              <Wand2 size={16} />
+              <span>Deobfuscated Component</span>
+            </div>
+            <CodeEditor
+              className='border mt-2 w-[1250px] rounded-md'
+              height={400}
+              language='html'
+              value={deobfuscatedComponent}
+              readOnly
+            />
           </div>
 
         </div>
